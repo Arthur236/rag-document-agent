@@ -1,13 +1,14 @@
 """
 Streamlit front-end for the local RAG pipeline.
 
-Lets the user upload any PDF, asks questions about it, and streams
-the answer token-by-token from a fully local LLM — no cloud required.
+Lets the user upload a document (PDF, Word, PowerPoint, or plain text), asks
+questions about it, and streams the answer token-by-token from a fully local
+LLM — no cloud required.
 
 Pipeline recap
 --------------
-PDF upload → PdfReader (text extraction) → LocalEmbedding (indexing)
-→ AiModel.ask_a_question_from_pdf_stream (retrieval + generation)
+Document upload → DocumentReader (text extraction) → LocalEmbedding (indexing)
+→ AiModel.ask_a_question_from_document_stream (retrieval + generation)
 → st.write_stream (live token rendering in the browser)
 """
 
@@ -19,7 +20,7 @@ from dotenv import load_dotenv
 
 from local_llm import AiModel
 from local_embeddings import LocalEmbedding
-from pdf_reader import PdfReader
+from document_reader import DocumentReader
 
 
 # ------------------------------------------------------------------
@@ -42,8 +43,8 @@ st.set_page_config(
 # within a single browser session.
 
 for key, default in [
-    ("pdf_name", None),  # filename — used to detect when the user switches PDFs
-    ("tmp_pdf_path", None),  # path to the temp file PdfReader opens
+    ("doc_name", None),  # filename — used to detect when the user switches documents
+    ("tmp_doc_path", None),  # path to the temp file DocumentReader opens
     (
         "local_embedding",
         None,
@@ -71,13 +72,15 @@ def load_ai_model() -> AiModel:
     return AiModel()
 
 
-def save_uploaded_pdf(uploaded_file) -> str:
+def save_uploaded_file(uploaded_file) -> str:
     """
-    Writes the uploaded PDF bytes to a NamedTemporaryFile on disk
+    Writes the uploaded document bytes to a NamedTemporaryFile on disk
     and returns the absolute path to that file.
 
-    delete=False is required because PdfReader must open the file
+    delete=False is required because DocumentReader must open the file
     by path after this function returns — it cannot accept raw bytes.
+    The original filename is kept as the suffix so DocumentReader can
+    infer the file type from its extension.
     """
     suffix = f"_{uploaded_file.name}"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -91,7 +94,10 @@ def save_uploaded_pdf(uploaded_file) -> str:
 
 with st.sidebar:
     st.markdown("## 📄 RAG Assistant")
-    st.markdown("Ask questions about any PDF — fully local, no cloud required.")
+    st.markdown(
+        "Ask questions about any PDF, Word, PowerPoint, or text document — "
+        "fully local, no cloud required."
+    )
     st.divider()
 
     # Model loading
@@ -108,32 +114,32 @@ with st.sidebar:
     # Document upload
     st.markdown("#### Document")
     uploaded_file = st.file_uploader(
-        "Upload a PDF",
-        type=["pdf"],
-        help="Drag and drop a PDF here, or click Browse files.",
+        "Upload a document",
+        type=["pdf", "txt", "md", "docx", "pptx"],
+        help="Drag and drop a PDF, Word, PowerPoint, or text file here, or click Browse files.",
         label_visibility="collapsed",
     )
 
     if uploaded_file is not None:
-        # When the user uploads a different PDF, tear down the previous state
-        if uploaded_file.name != st.session_state.pdf_name:
-            if st.session_state.tmp_pdf_path and os.path.exists(
-                st.session_state.tmp_pdf_path
+        # When the user uploads a different document, tear down the previous state
+        if uploaded_file.name != st.session_state.doc_name:
+            if st.session_state.tmp_doc_path and os.path.exists(
+                st.session_state.tmp_doc_path
             ):
-                os.unlink(st.session_state.tmp_pdf_path)  # free the old temp file
+                os.unlink(st.session_state.tmp_doc_path)  # free the old temp file
 
-            st.session_state.pdf_name = uploaded_file.name
-            st.session_state.tmp_pdf_path = save_uploaded_pdf(uploaded_file)
+            st.session_state.doc_name = uploaded_file.name
+            st.session_state.tmp_doc_path = save_uploaded_file(uploaded_file)
             st.session_state.local_embedding = None  # force re-indexing for new doc
             st.session_state.chat_history = []  # clear history for new doc
             st.session_state.chunk_count = 0
 
-        # Build the embedding index the first time this PDF is uploaded
+        # Build the embedding index the first time this document is uploaded
         if st.session_state.local_embedding is None:
             with st.status("Processing document…", expanded=True) as doc_status:
-                st.write("Extracting text from PDF…")
-                pdf_reader = PdfReader(st.session_state.tmp_pdf_path)
-                chunks = pdf_reader.get_chunks()
+                st.write("Extracting text from document…")
+                document_reader = DocumentReader(st.session_state.tmp_doc_path)
+                chunks = document_reader.get_chunks()
                 st.session_state.chunk_count = len(chunks)
 
                 st.write(f"Building embedding index for {len(chunks)} chunks…")
@@ -149,11 +155,11 @@ with st.sidebar:
         else:
             # Subsequent reruns (e.g. user typed a question): show a simple badge
             st.success(
-                f"{st.session_state.pdf_name}\n\n"
+                f"{st.session_state.doc_name}\n\n"
                 f"{st.session_state.chunk_count} chunks indexed"
             )
     else:
-        st.info("Upload a PDF to get started.")
+        st.info("Upload a document to get started.")
 
     st.divider()
     st.caption(
@@ -165,13 +171,13 @@ with st.sidebar:
 # Main content area — chat interface
 # ------------------------------------------------------------------
 
-st.markdown("# Ask Your Document")
+st.markdown("# Ask About Your Document")
 
 if st.session_state.local_embedding is None:
-    st.markdown("> **Upload a PDF in the sidebar** to begin asking questions.")
+    st.markdown("> **Upload a document in the sidebar** to begin asking questions.")
 else:
     st.markdown(
-        f"Chatting about **{st.session_state.pdf_name}** · "
+        f"Chatting about **{st.session_state.doc_name}** · "
         f"{st.session_state.chunk_count} chunks indexed"
     )
 
@@ -183,7 +189,7 @@ for message in st.session_state.chat_history:
         st.markdown(message["content"])
 
 # Chat input — pinned to the bottom of the page by Streamlit natively.
-# Passing disabled=True prevents questions before a PDF is indexed.
+# Passing disabled=True prevents questions before a document is indexed.
 prompt = st.chat_input(
     placeholder="Ask a question about your document…",
     disabled=(st.session_state.local_embedding is None),
@@ -199,8 +205,8 @@ if prompt:
     # st.write_stream consumes the generator and renders each chunk as it arrives,
     # then returns the fully concatenated string when generation is complete.
     with st.chat_message("assistant"):
-        response_stream = ai_model.ask_a_question_from_pdf_stream(
-            pdf_path=st.session_state.tmp_pdf_path,
+        response_stream = ai_model.ask_a_question_from_document_stream(
+            document_path=st.session_state.tmp_doc_path,
             prompt=prompt,
             local_embedding=st.session_state.local_embedding,
         )

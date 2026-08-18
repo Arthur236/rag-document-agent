@@ -84,12 +84,12 @@ class LocalEmbedding:
 # Example usage
 ###############
 
-# from pdf_reader import PdfReader
+# from document_reader import DocumentReader
 #
 # embedder = LocalEmbedding()
 #
-# pdf_reader = PdfReader()
-# chunks = pdf_reader.get_chunks()
+# document_reader = DocumentReader()
+# chunks = document_reader.get_chunks()
 # embedder.build_index(chunks)
 
 # results = embedder.search("what is this document all about", k=10)

@@ -12,7 +12,7 @@ from transformers import (
     TextStreamer,
 )
 
-from pdf_reader import PdfReader
+from document_reader import DocumentReader
 
 
 class AiModel:
@@ -80,22 +80,22 @@ class AiModel:
         # max_new_tokens caps the response length; streamer handles all printing internally.
         self.model.generate(**inputs, max_new_tokens=1000, streamer=streamer)
 
-    def ask_a_question_from_pdf(
-        self, pdf_path, prompt="tell me what is this pdf about"
+    def ask_a_question_from_document(
+        self, document_path, prompt="tell me what is this document about"
     ):
         """
-        this function allows the user to take a pdf and ask some questions about the pdf,
-        performing RAG operation
+        this function allows the user to take a document (PDF, Word, PowerPoint, or plain text)
+        and ask some questions about it, performing RAG operation
         """
-        # creating our PdfReader to work with the pdf text
-        pdf_reader = PdfReader(pdf_path)
-        pdf_chunks = pdf_reader.get_chunks()
+        # creating our DocumentReader to work with the document text
+        document_reader = DocumentReader(document_path)
+        document_chunks = document_reader.get_chunks()
 
         # embedding and indexing all chunks
         local_embedding = LocalEmbedding()
-        local_embedding.build_index(pdf_chunks)
+        local_embedding.build_index(document_chunks)
 
-        # getting relevant sections of the pdf
+        # getting relevant sections of the document
         relevent_sections = local_embedding.get_context(prompt, 10)
 
         # crafting message
@@ -119,19 +119,19 @@ class AiModel:
         # max_new_tokens caps the response length; streamer handles all printing internally.
         self.model.generate(**inputs, max_new_tokens=1000, streamer=streamer)
 
-    def ask_a_question_from_pdf_stream(
+    def ask_a_question_from_document_stream(
         self,
-        pdf_path: str,
-        prompt: str = "tell me what is this pdf about",
+        document_path: str,
+        prompt: str = "tell me what is this document about",
         local_embedding=None,
     ):
         """
-        Streaming variant of ask_a_question_from_pdf.
+        Streaming variant of ask_a_question_from_document.
         Yields decoded text chunks via TextIteratorStreamer so callers (e.g. st.write_stream)
         can consume tokens in real time without blocking on stdout.
 
         Args:
-            pdf_path:        Path to the PDF on disk.
+            document_path:   Path to the document on disk (PDF, Word, PowerPoint, or text).
             prompt:          User question string.
             local_embedding: Pre-built LocalEmbedding instance (already indexed).
                              If None, builds the index from scratch.
@@ -139,10 +139,10 @@ class AiModel:
             str chunks as the model generates them.
         """
         if local_embedding is None:
-            pdf_reader = PdfReader(pdf_path)
-            pdf_chunks = pdf_reader.get_chunks()
+            document_reader = DocumentReader(document_path)
+            document_chunks = document_reader.get_chunks()
             local_embedding = LocalEmbedding()
-            local_embedding.build_index(pdf_chunks)
+            local_embedding.build_index(document_chunks)
 
         relevant_sections = local_embedding.get_context(prompt, k=10)
         full_prompt = self.full_prompt_for_rag(
@@ -177,7 +177,7 @@ class AiModel:
 
     def full_prompt_for_rag(self, relevent_sections, question_prompt):
         """
-        this is a prompt constructor that will put together the user question, the pdf relevant sections, and system prompt
+        this is a prompt constructor that will put together the user question, the document's relevant sections, and system prompt
         """
         return f"""
             <|system|>
@@ -198,4 +198,4 @@ class AiModel:
 
 
 # new_ai_model = AiModel()
-# new_ai_model.ask_a_question_from_pdf("./data/Microsoft_10K_2025.pdf")
+# new_ai_model.ask_a_question_from_document("./data/Microsoft_10K_2025.pdf")
