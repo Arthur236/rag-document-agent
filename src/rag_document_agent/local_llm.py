@@ -4,7 +4,7 @@ from threading import Thread
 
 import torch  # PyTorch, the backend for transformers
 from huggingface_hub import login
-from local_embeddings import LocalEmbedding
+from rag_document_agent.local_embeddings import LocalEmbedding
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -12,7 +12,7 @@ from transformers import (
     TextStreamer,
 )
 
-from document_reader import DocumentReader
+from rag_document_agent.document_reader import DocumentReader
 
 
 class AiModel:

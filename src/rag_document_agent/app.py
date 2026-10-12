@@ -18,9 +18,9 @@ import tempfile
 import streamlit as st
 from dotenv import load_dotenv
 
-from local_llm import AiModel
-from local_embeddings import LocalEmbedding
-from document_reader import DocumentReader
+from rag_document_agent.local_llm import AiModel
+from rag_document_agent.local_embeddings import LocalEmbedding
+from rag_document_agent.document_reader import DocumentReader
 
 
 # ------------------------------------------------------------------
@@ -221,4 +221,4 @@ if prompt:
 # Run
 ###############
 
-# uv run streamlit run main.py
+# uv run rag-document-agent

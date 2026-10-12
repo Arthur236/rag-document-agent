@@ -84,7 +84,7 @@ class LocalEmbedding:
 # Example usage
 ###############
 
-# from document_reader import DocumentReader
+# from rag_document_agent.document_reader import DocumentReader
 #
 # embedder = LocalEmbedding()
 #
