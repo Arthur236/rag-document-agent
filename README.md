@@ -67,6 +67,10 @@ src/rag_document_agent/
 data/                   Sample documents
 ```
 
+## Screenshots
+
+![app screenshot](<screenshot.png>)
+
 ## Limitations
 
 The current design keeps things simple, which comes with a few constraints worth knowing about.
